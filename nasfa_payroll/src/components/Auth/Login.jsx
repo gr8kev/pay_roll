@@ -1,9 +1,18 @@
 import officer from "../../assets/officer.jpg";
 import logo from "../../assets/logo.png";
+import { Link } from "react-router-dom";
 
 export default function Login() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-white">
+      <div className="absolute top-6 right-6 flex items-center gap-3">
+        <p className="text-gray-600 text-sm">Don't have an account?</p>
+        <Link to="/signup">
+          <button className="border border-gray-400 text-sm px-4 py-1.5 rounded-lg hover:bg-gray-100">
+            Sign up
+          </button>
+        </Link>
+      </div>
       {/* Left Side - Image (Hidden on Mobile) */}
       <div className="hidden md:block md:w-1/2 p-2 md:h-auto">
         <img
