@@ -1,0 +1,21 @@
+{
+  "python.defaultInterpreterPath": "/Users/obikelvin/Desktop/kigbu/server/venv/bin/python",
+  "python.analysis.extraPaths": ["./"],
+  "python.analysis.autoImportCompletions": true,
+  "cSpell.words": [
+    "checkpw",
+    "dnspython",
+    "dotenv",
+    "gensalt",
+    "hashpw",
+    "idna",
+    "itsdangerous",
+    "jsonify",
+    "nasfa",
+    "pymongo",
+    "Topbar",
+    "VITE",
+    "Werkzeug",
+    "zipp"
+  ]
+}
