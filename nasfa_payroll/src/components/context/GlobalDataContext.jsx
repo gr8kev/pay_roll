@@ -4,7 +4,6 @@ import { toast } from "react-hot-toast";
 
 const GlobalDataContext = createContext();
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useGlobalData = () => {
   const context = useContext(GlobalDataContext);
   if (!context)
@@ -34,7 +33,7 @@ export const GlobalDataProvider = ({ children }) => {
     return Math.round(
       (Number(deductions.electricityBill) || 0) +
         (Number(deductions.waterRate) || 0) +
-        (Number(deductions.newisDeduction) || 0) +
+        (Number(deductions.nawisDeduction) || 0) +
         (Number(deductions.benevolent) || 0) +
         (Number(deductions.quarterRental) || 0) +
         (Number(deductions.incomeTax) || 0)
@@ -105,6 +104,7 @@ export const GlobalDataProvider = ({ children }) => {
 
   // --- Derived values ---
   const activePersonnel = staffData.filter((s) => s.status === "active");
+  const inactivePersonnel = staffData.filter((s) => s.status === "inactive");
 
   const totalNetPayroll = payrollData.reduce(
     (sum, p) => sum + (p.totalAmount || 0),
@@ -125,12 +125,14 @@ export const GlobalDataProvider = ({ children }) => {
 
   // --- CRUD Helpers ---
   const addStaff = (newStaff) => setStaffData((prev) => [...prev, newStaff]);
+
   const updateStaff = (updatedStaff) =>
     setStaffData((prev) =>
       prev.map((s) =>
         String(s._id) === String(updatedStaff._id) ? updatedStaff : s
       )
     );
+
   const deleteStaff = async (id) => {
     try {
       await axios.delete(
@@ -144,14 +146,31 @@ export const GlobalDataProvider = ({ children }) => {
     }
   };
 
+  // --- Toggle Status ---
+  const toggleStaffStatus = async (id) => {
+    try {
+      const res = await axios.patch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/staff/${id}/toggle-status`
+      );
+      const updatedStaff = res.data.data;
+      updateStaff(updatedStaff);
+      toast.success(res.data.message);
+    } catch (err) {
+      console.error("Toggle status error:", err);
+      toast.error(err.response?.data?.error || "Error toggling status");
+    }
+  };
+
   const addPayroll = (newPayroll) =>
     setPayrollData((prev) => [newPayroll, ...prev]);
+
   const updatePayroll = (updatedPayroll) =>
     setPayrollData((prev) =>
       prev.map((p) =>
         String(p._id) === String(updatedPayroll._id) ? updatedPayroll : p
       )
     );
+
   const deletePayroll = async (id) => {
     try {
       await axios.delete(
@@ -178,10 +197,12 @@ export const GlobalDataProvider = ({ children }) => {
         addStaff,
         updateStaff,
         deleteStaff,
+        toggleStaffStatus,
         addPayroll,
         updatePayroll,
         deletePayroll,
         activePersonnel,
+        inactivePersonnel,
         totalNetPayroll,
         totalAllowance,
         totalEarnings,

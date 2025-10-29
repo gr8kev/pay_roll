@@ -1,1 +1,6 @@
 @import "tailwindcss";
+/* Remove default focus ring globally */
+*:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}

@@ -1,4 +1,3 @@
-// Staff.jsx
 import React, { useState } from "react";
 import axios from "axios";
 import { toast, Toaster } from "react-hot-toast";
@@ -7,9 +6,12 @@ import { useGlobalData } from "../components/context/GlobalDataContext";
 export default function Staff() {
   const {
     staffData,
+    activePersonnel,
+    inactivePersonnel,
     addStaff,
     updateStaff,
     deleteStaff,
+    toggleStaffStatus,
     loading: contextLoading,
   } = useGlobalData();
 
@@ -18,8 +20,8 @@ export default function Staff() {
   const [submitting, setSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, active, inactive
 
-  // initial numeric fields set to 0 to avoid strings creeping in
   const initialFormData = {
     firstName: "",
     lastName: "",
@@ -46,7 +48,6 @@ export default function Staff() {
 
   const [formData, setFormData] = useState(initialFormData);
 
-  // list of numeric field names (we ensure these are Numbers)
   const numericFields = new Set([
     "conafss",
     "staffGrant",
@@ -64,7 +65,6 @@ export default function Staff() {
     const { name, value } = e.target;
 
     if (numericFields.has(name)) {
-      // value might be "" when clearing input; interpret as 0
       const val = value === "" ? 0 : Number(value);
       setFormData((prev) => ({
         ...prev,
@@ -96,7 +96,6 @@ export default function Staff() {
       corps: person.corps || "",
       bankName: person.bankName || "",
       accountNumber: person.accountNumber || "",
-      // prefer nested salary/deductions if present, fallback to top-level fields
       conafss: Number(person.salary?.conafss ?? person.conafss ?? 0) || 0,
       staffGrant:
         Number(person.salary?.staffGrant ?? person.staffGrant ?? 0) || 0,
@@ -116,7 +115,7 @@ export default function Staff() {
         ) || 0,
       waterRate:
         Number(person.deductions?.waterRate ?? person.waterRate ?? 0) || 0,
-      newisDeduction:
+      nawisDeduction:
         Number(
           person.deductions?.nawisDeduction ?? person.nawisDeduction ?? 0
         ) || 0,
@@ -143,7 +142,6 @@ export default function Staff() {
     setSubmitting(true);
 
     try {
-      // Build salary + deductions objects (numbers guaranteed)
       const salary = {
         conafss: Number(formData.conafss) || 0,
         staffGrant: Number(formData.staffGrant) || 0,
@@ -154,13 +152,12 @@ export default function Staff() {
       const deductions = {
         electricityBill: Number(formData.electricityBill) || 0,
         waterRate: Number(formData.waterRate) || 0,
-        nawisDeduction: Number(formData.newisDeduction) || 0,
+        nawisDeduction: Number(formData.nawisDeduction) || 0,
         benevolent: Number(formData.benevolent) || 0,
         quarterRental: Number(formData.quarterRental) || 0,
         incomeTax: Number(formData.incomeTax) || 0,
       };
 
-      // payload: include nested objects (preferred) and keep top-level compatibility if needed
       const payload = {
         firstName: (formData.firstName || "").trim(),
         lastName: (formData.lastName || "").trim(),
@@ -174,7 +171,6 @@ export default function Staff() {
         createdBy: formData.createdBy || "Admin",
         salary,
         deductions,
-        // also keep flat keys (in case backend expects them)
         conafss: salary.conafss,
         staffGrant: salary.staffGrant,
         specialForcesAllowance: salary.specialForcesAllowance,
@@ -205,7 +201,6 @@ export default function Staff() {
         toast.success("Personnel added successfully!");
       }
 
-      // reset UI
       setShowModal(false);
       setIsEditing(false);
       setFormData(initialFormData);
@@ -230,6 +225,25 @@ export default function Staff() {
       toast.error("Error deleting personnel");
     }
   };
+
+  const handleToggleStatus = async (person) => {
+    const newStatus = person.status === "active" ? "inactive" : "active";
+    if (
+      !window.confirm(
+        `Change ${person.firstName} ${person.lastName} to ${newStatus}?`
+      )
+    )
+      return;
+    await toggleStaffStatus(person._id);
+  };
+
+  // Filter personnel based on status
+  const filteredStaff =
+    statusFilter === "all"
+      ? staffData
+      : statusFilter === "active"
+      ? activePersonnel
+      : inactivePersonnel;
 
   if (contextLoading) {
     return (
@@ -266,41 +280,108 @@ export default function Staff() {
         </button>
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 mb-6 border-b">
+        <button
+          onClick={() => setStatusFilter("all")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            statusFilter === "all"
+              ? "text-green-600 border-b-2 border-green-600"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          All ({staffData.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter("active")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            statusFilter === "active"
+              ? "text-green-600 border-b-2 border-green-600"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Active ({activePersonnel.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter("inactive")}
+          className={`px-4 py-2 font-medium transition-colors ${
+            statusFilter === "inactive"
+              ? "text-gray-600 border-b-2 border-gray-600"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Inactive ({inactivePersonnel.length})
+        </button>
+      </div>
+
       {/* Personnel Grid */}
-      {Array.isArray(staffData) && staffData.length > 0 ? (
+      {Array.isArray(filteredStaff) && filteredStaff.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {staffData.map((staff) => {
+          {filteredStaff.map((staff) => {
             const staffId =
               typeof staff._id === "string"
                 ? staff._id
                 : staff._id?.$oid || String(staff._id);
+            const isActive = staff.status === "active";
+
             return (
               <div
                 key={staffId}
-                onClick={() => setShowDetails(staff)}
-                className="border rounded-xl p-4 flex flex-col items-center shadow-sm hover:shadow-md transition cursor-pointer"
+                className={`border rounded-xl p-4 flex flex-col items-center shadow-sm hover:shadow-md transition cursor-pointer relative ${
+                  !isActive ? "opacity-60 border-gray-400" : ""
+                }`}
               >
-                <img
-                  src={
-                    staff.passport ||
-                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23ddd'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='monospace' font-size='14' fill='%23999'%3ENo Image%3C/text%3E%3C/svg%3E"
-                  }
-                  alt={staff.firstName}
-                  className="w-24 h-24 rounded-full object-cover mb-3 border"
-                />
-                <h3 className="font-semibold text-gray-800 text-center">
-                  {staff.firstName} {staff.lastName}
-                </h3>
-                <p className="text-gray-600 text-sm mt-1">{staff.rank}</p>
-                <p className="text-gray-500 text-xs mt-1">
-                  {staff.serviceNumber}
-                </p>
+                {/* Status Badge */}
+                <div
+                  className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+                    isActive
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {isActive ? "Active" : "Inactive"}
+                </div>
+
+                <div onClick={() => setShowDetails(staff)}>
+                  <img
+                    src={
+                      staff.passport ||
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23ddd'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='monospace' font-size='14' fill='%23999'%3ENo Image%3C/text%3E%3C/svg%3E"
+                    }
+                    alt={staff.firstName}
+                    className="w-24 h-24 rounded-full object-cover mb-3 border"
+                  />
+                  <h3 className="font-semibold text-gray-800 text-center">
+                    {staff.firstName} {staff.lastName}
+                  </h3>
+                  <p className="text-gray-600 text-sm mt-1">{staff.rank}</p>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {staff.serviceNumber}
+                  </p>
+                </div>
+
+                {/* Toggle Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleStatus(staff);
+                  }}
+                  className={`mt-3 w-full text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                    isActive
+                      ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                >
+                  {isActive ? "Mark Inactive" : "Mark Active"}
+                </button>
               </div>
             );
           })}
         </div>
       ) : (
-        <p className="text-center text-gray-500">No personnel found</p>
+        <p className="text-center text-gray-500">
+          No {statusFilter !== "all" ? statusFilter : ""} personnel found
+        </p>
       )}
 
       {/* Add / Edit Modal */}
@@ -348,7 +429,6 @@ export default function Staff() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Basic Info */}
               {activeTab === "basic" && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -437,7 +517,6 @@ export default function Staff() {
                 </>
               )}
 
-              {/* Salary Tab */}
               {activeTab === "salary" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FieldNumber
@@ -467,7 +546,6 @@ export default function Staff() {
                 </div>
               )}
 
-              {/* Deductions Tab */}
               {activeTab === "deductions" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FieldNumber
@@ -540,16 +618,13 @@ export default function Staff() {
           showDetails={showDetails}
           onEdit={() => handleEdit(showDetails)}
           onDelete={() => handleDelete(showDetails._id)}
+          onToggleStatus={() => handleToggleStatus(showDetails)}
           onClose={() => setShowDetails(null)}
         />
       )}
     </div>
   );
 }
-
-/* --------------------------
-   Small helper components
-   -------------------------- */
 
 function FieldNumber({ name, label, value, onChange }) {
   return (
@@ -568,7 +643,15 @@ function FieldNumber({ name, label, value, onChange }) {
   );
 }
 
-function DetailsModal({ showDetails, onEdit, onDelete, onClose }) {
+function DetailsModal({
+  showDetails,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+  onClose,
+}) {
+  const isActive = showDetails.status === "active";
+
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
@@ -576,6 +659,17 @@ function DetailsModal({ showDetails, onEdit, onDelete, onClose }) {
     >
       <div className="bg-white border rounded-xl shadow-xl p-6 w-full max-w-md">
         <div className="flex flex-col items-center text-center mb-4">
+          {/* Status Badge */}
+          <div
+            className={`mb-3 px-3 py-1 rounded-full text-sm font-medium ${
+              isActive
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {isActive ? "Active" : "Inactive"}
+          </div>
+
           <img
             src={
               showDetails.passport ||
@@ -621,31 +715,48 @@ function DetailsModal({ showDetails, onEdit, onDelete, onClose }) {
           )}
         </div>
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex flex-col gap-3 mt-6">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onEdit();
+              onToggleStatus();
             }}
-            className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
+            className={`w-full px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+              isActive
+                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
           >
-            Edit
+            {isActive ? "Mark as Inactive" : "Mark as Active"}
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
-          >
-            Delete
-          </button>
+
+          <div className="flex gap-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
+            >
+              Edit
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
+            >
+              Delete
+            </button>
+          </div>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
-            className="flex-1 px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm"
+            className="w-full px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm"
           >
             Close
           </button>

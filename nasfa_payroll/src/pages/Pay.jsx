@@ -104,7 +104,7 @@ export default function Pay() {
 
   return (
     <div className="bg-white rounded-lg shadow p-6 max-w-7xl mx-auto">
-      <Toaster position="top-right" reverseOrder={false} />
+      <Toaster position="top-center" reverseOrder={false} />
 
       {/* Header */}
       <div className="mb-6">

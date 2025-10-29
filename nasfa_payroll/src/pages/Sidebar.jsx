@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Users,
-  DollarSign,
   Calendar,
   BarChart3,
   Settings,
@@ -10,13 +9,14 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+import NairaIcon from "../components/Icons/NairaIcon"; // adjust path if needed
 
 export default function Sidebar({ activeMenu, setActiveMenu, sidebarOpen }) {
   const navigate = useNavigate();
 
   const menuItems = [
     { name: "Dashboard Overview", icon: LayoutDashboard },
-    { name: "Payroll Management", icon: DollarSign },
+    { name: "Payroll Management", icon: NairaIcon }, // ✅ Lucide-style Naira symbol
     { name: "Payroll Calendar", icon: Calendar },
     { name: "Staff Management", icon: Users },
     { name: "Recent Activities", icon: Activity },
