@@ -70,20 +70,23 @@ def login():
         if not data:
             return jsonify({"msg": "Missing JSON in request"}), 400
 
-        email = data.get('email')
+        service_number = data.get('serviceNumber')
         password = data.get('password')
 
-        if not email or not password:
-            return jsonify({"msg": "Missing email or password"}), 400
+        if not service_number or not password:
+            return jsonify({"msg": "Missing service number or password"}), 400
 
-        user = mongo.db.users.find_one({"email": email})
+        # Search by serviceNumber instead of email
+        user = mongo.db.users.find_one({"serviceNumber": service_number})
         if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
-            return jsonify({"msg": "Invalid email or password"}), 401
+            return jsonify({"msg": "Invalid service number or password"}), 401
 
+        # Use serviceNumber as identity
         access_token = create_access_token(
-            identity=email,
+            identity=service_number,
             expires_delta=timedelta(days=7)
         )
+        
         return jsonify({
             "msg": "Login successful",
             "access_token": access_token,

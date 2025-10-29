@@ -9,7 +9,7 @@ def soldier_schema(data):
         "lastName": data.get("lastName"),
         "rank": data.get("rank"),
         "serviceNumber": data.get("serviceNumber"),
-        "department": data.get("department"),
+        "unit": data.get("unit"),
         "corps": data.get("corps"),
         
         # Bank Details
@@ -28,7 +28,7 @@ def soldier_schema(data):
         "deductions": {
             "electricityBill": float(data.get("electricityBill", 0)),
             "waterRate": float(data.get("waterRate", 0)),
-            "newisDeduction": float(data.get("newisDeduction", 0)),
+            "nawisDeduction": float(data.get("nawisDeduction", 0)),
             "benevolent": float(data.get("benevolent", 0)),
             "quarterRental": float(data.get("quarterRental", 0)),
             "incomeTax": float(data.get("incomeTax", 0)),

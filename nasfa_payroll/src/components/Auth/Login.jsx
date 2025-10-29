@@ -11,7 +11,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: "",
+    serviceNumber: "",
     password: "",
   });
 
@@ -31,12 +31,12 @@ export default function Login() {
 
       toast.success("Login successful!");
       localStorage.setItem("token", res.data.access_token);
-      // After a successful login:
       localStorage.setItem(
         "user",
         JSON.stringify({
-          fullName: res.data.fullName, // backend should return this
+          fullName: res.data.fullName,
           rank: res.data.rank,
+          serviceNumber: res.data.serviceNumber,
         })
       );
 
@@ -95,20 +95,20 @@ export default function Login() {
               Sign in
             </h2>
             <p className="text-gray-500 mb-6">
-              Sign in with your registered email and password
+              Sign in with your service number and password
             </p>
 
             <form onSubmit={handleSubmit}>
-              {/* Email */}
+              {/* Service Number */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700">
-                  Official Email
+                  Service Number
                 </label>
                 <input
-                  type="email"
-                  name="email"
-                  placeholder="Enter official email"
-                  value={formData.email}
+                  type="text"
+                  name="serviceNumber"
+                  placeholder="Enter official service number"
+                  value={formData.serviceNumber}
                   onChange={handleChange}
                   className="w-full mt-1 border border-gray-300 bg-[#F4F4F4] rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-600 focus:outline-none"
                   required

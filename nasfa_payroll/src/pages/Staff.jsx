@@ -25,7 +25,7 @@ export default function Staff() {
     lastName: "",
     rank: "",
     serviceNumber: "",
-    department: "",
+    unit: "",
     corps: "",
     bankName: "",
     accountNumber: "",
@@ -35,7 +35,7 @@ export default function Staff() {
     packingAllowance: 0,
     electricityBill: 0,
     waterRate: 0,
-    newisDeduction: 0,
+    nawisDeduction: 0,
     benevolent: 0,
     quarterRental: 0,
     incomeTax: 0,
@@ -54,14 +54,14 @@ export default function Staff() {
     "packingAllowance",
     "electricityBill",
     "waterRate",
-    "newisDeduction",
+    "nawisDeduction",
     "benevolent",
     "quarterRental",
     "incomeTax",
   ]);
 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
 
     if (numericFields.has(name)) {
       // value might be "" when clearing input; interpret as 0
@@ -92,7 +92,7 @@ export default function Staff() {
       lastName: person.lastName || "",
       rank: person.rank || "",
       serviceNumber: person.serviceNumber || "",
-      department: person.department || "",
+      unit: person.unit || "",
       corps: person.corps || "",
       bankName: person.bankName || "",
       accountNumber: person.accountNumber || "",
@@ -118,7 +118,7 @@ export default function Staff() {
         Number(person.deductions?.waterRate ?? person.waterRate ?? 0) || 0,
       newisDeduction:
         Number(
-          person.deductions?.newisDeduction ?? person.newisDeduction ?? 0
+          person.deductions?.nawisDeduction ?? person.nawisDeduction ?? 0
         ) || 0,
       benevolent:
         Number(person.deductions?.benevolent ?? person.benevolent ?? 0) || 0,
@@ -154,7 +154,7 @@ export default function Staff() {
       const deductions = {
         electricityBill: Number(formData.electricityBill) || 0,
         waterRate: Number(formData.waterRate) || 0,
-        newisDeduction: Number(formData.newisDeduction) || 0,
+        nawisDeduction: Number(formData.newisDeduction) || 0,
         benevolent: Number(formData.benevolent) || 0,
         quarterRental: Number(formData.quarterRental) || 0,
         incomeTax: Number(formData.incomeTax) || 0,
@@ -166,7 +166,7 @@ export default function Staff() {
         lastName: (formData.lastName || "").trim(),
         rank: formData.rank || "",
         serviceNumber: formData.serviceNumber || "",
-        department: formData.department || "",
+        unit: formData.unit || "",
         corps: formData.corps || "",
         bankName: formData.bankName || "",
         accountNumber: formData.accountNumber || "",
@@ -181,7 +181,7 @@ export default function Staff() {
         packingAllowance: salary.packingAllowance,
         electricityBill: deductions.electricityBill,
         waterRate: deductions.waterRate,
-        newisDeduction: deductions.newisDeduction,
+        nawisDeduction: deductions.nawisDeduction,
         benevolent: deductions.benevolent,
         quarterRental: deductions.quarterRental,
         incomeTax: deductions.incomeTax,
@@ -395,9 +395,9 @@ export default function Staff() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
-                      name="department"
-                      placeholder="Department"
-                      value={formData.department}
+                      name="unit"
+                      placeholder="Unit"
+                      value={formData.unit}
                       onChange={handleChange}
                       className="border rounded-lg px-3 py-2 w-full text-sm"
                     />
@@ -483,9 +483,9 @@ export default function Staff() {
                     onChange={handleChange}
                   />
                   <FieldNumber
-                    name="newisDeduction"
-                    label="NEWIS Deduction"
-                    value={formData.newisDeduction}
+                    name="nawisDeduction"
+                    label="NaWIS Deduction"
+                    value={formData.nawisDeduction}
                     onChange={handleChange}
                   />
                   <FieldNumber
@@ -595,10 +595,10 @@ function DetailsModal({ showDetails, onEdit, onDelete, onClose }) {
             <span className="text-gray-600">Service Number:</span>
             <span className="font-medium">{showDetails.serviceNumber}</span>
           </div>
-          {showDetails.department && (
+          {showDetails.unit && (
             <div className="flex justify-between border-b pb-2">
-              <span className="text-gray-600">Department:</span>
-              <span className="font-medium">{showDetails.department}</span>
+              <span className="text-gray-600">Unit:</span>
+              <span className="font-medium">{showDetails.unit}</span>
             </div>
           )}
           {showDetails.corps && (

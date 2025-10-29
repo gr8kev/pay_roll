@@ -376,11 +376,9 @@ export default function Pay() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">
-                    Department
-                  </p>
+                  <p className="text-xs text-gray-500 uppercase mb-1">Unit</p>
                   <p className="font-semibold text-gray-800">
-                    {selectedPayslip.department || "N/A"}
+                    {selectedPayslip.unit || "N/A"}
                   </p>
                 </div>
                 <div>
@@ -483,7 +481,7 @@ export default function Pay() {
                       </td>
                     </tr>
                     <tr className="border-b">
-                      <td className="py-2 text-gray-600">NEWIS Deduction</td>
+                      <td className="py-2 text-gray-600">NAWIS Deduction</td>
                       <td className="py-2 text-right font-semibold">
                         ₦
                         {Math.round(

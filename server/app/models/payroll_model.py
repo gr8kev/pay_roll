@@ -26,7 +26,7 @@ def payroll_personnel_item(soldier):
         "lastName": soldier.get("lastName"),
         "rank": soldier.get("rank"),
         "serviceNumber": soldier.get("serviceNumber"),
-        "department": soldier.get("department"),
+        "unit": soldier.get("unit"),
         "corps": soldier.get("corps"),
         "bankName": soldier.get("bankName"),
         "accountNumber": soldier.get("accountNumber"),

@@ -86,7 +86,7 @@ export default function Signup() {
 
             <form onSubmit={handleSubmit} className="w-full">
               <h2 className="text-3xl font-semibold text-gray-900 mb-2">
-                Officer Signup
+                Signup
               </h2>
               <p className="text-gray-500 mb-6">
                 Please provide accurate details to register.
