@@ -1,4 +1,3 @@
-// ReportsAnalytics.jsx
 import React, { useState, useMemo } from "react";
 import { useGlobalData } from "../components/context/GlobalDataContext";
 import {
@@ -27,6 +26,7 @@ export default function ReportsAnalytics() {
     loading,
     calculateEarnings,
     calculateDeductions,
+    calculateNetPay,
   } = useGlobalData();
 
   const [dateRange, setDateRange] = useState("all");
@@ -42,15 +42,12 @@ export default function ReportsAnalytics() {
     "#166534",
   ];
 
-  // Filter payrolls by date range
   const filterByDateRange = (payrolls, range) => {
     if (range === "all") return payrolls;
-
     const now = new Date();
     return payrolls.filter((p) => {
       const payrollDate = new Date(p.createdAt);
       if (isNaN(payrollDate)) return false;
-
       switch (range) {
         case "3months":
           return (now - payrollDate) / (1000 * 60 * 60 * 24 * 30) <= 3;
@@ -72,29 +69,23 @@ export default function ReportsAnalytics() {
     statusDistribution,
     salaryComponents,
     deductionComponents,
+    payrollBreakdown,
   } = useMemo(() => {
     const staff = Array.isArray(staffData) ? staffData : [];
     const payrolls = Array.isArray(payrollData) ? payrollData : [];
-
     const filteredPayrolls = filterByDateRange(payrolls, dateRange);
 
-    // Calculate total payroll from filtered data
     const totalPayroll = filteredPayrolls.reduce(
       (sum, p) => sum + (p.totalAmount || 0),
       0
     );
-
     const averagePayroll = filteredPayrolls.length
       ? Math.round(totalPayroll / filteredPayrolls.length)
       : 0;
-
     const activeStaff = staff.filter((s) => s.status === "active").length;
-
-    // Calculate average allowance from earnings
     const totalEarnings = staff
       .filter((s) => s.status === "active")
       .reduce((sum, s) => sum + calculateEarnings(s), 0);
-
     const avgAllowance =
       activeStaff > 0 ? Math.round(totalEarnings / activeStaff) : 0;
 
@@ -106,7 +97,6 @@ export default function ReportsAnalytics() {
       averageAllowance: avgAllowance,
     };
 
-    // Monthly Payroll Disbursed chart (or fallback to salary components)
     const monthMap = {};
     filteredPayrolls.forEach((p) => {
       const date = new Date(p.createdAt);
@@ -117,18 +107,14 @@ export default function ReportsAnalytics() {
       const sortKey = `${date.getFullYear()}-${String(
         date.getMonth() + 1
       ).padStart(2, "0")}`;
-
-      if (!monthMap[sortKey]) {
+      if (!monthMap[sortKey])
         monthMap[sortKey] = { month: monthYear, amount: 0, sortKey };
-      }
       monthMap[sortKey].amount += p.totalAmount || 0;
     });
-
     const monthlyDisbursedData = Object.values(monthMap)
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .map(({ month, amount }) => ({ month, amount }));
 
-    // Fallback: Total Salary Components Breakdown (if no payroll data)
     const activeStaffList = staff.filter((s) => s.status === "active");
     const salaryComponentsData = [
       {
@@ -161,7 +147,6 @@ export default function ReportsAnalytics() {
       },
     ].filter((item) => item.amount > 0);
 
-    // Deduction Components Breakdown
     const deductionComponentsData = [
       {
         name: "Electricity",
@@ -178,9 +163,9 @@ export default function ReportsAnalytics() {
         ),
       },
       {
-        name: "NEWIS",
+        name: "NAWIS",
         amount: activeStaffList.reduce(
-          (sum, s) => sum + (Number(s.deductions?.newisDeduction) || 0),
+          (sum, s) => sum + (Number(s.deductions?.nawisDeduction) || 0),
           0
         ),
       },
@@ -207,19 +192,15 @@ export default function ReportsAnalytics() {
       },
     ].filter((item) => item.amount > 0);
 
-    // Corps Distribution (Pie Chart)
     const corpsMap = {};
     staff
       .filter((s) => s.status === "active")
       .forEach((s) => {
         const corps = s.corps || "Unassigned";
-        if (!corpsMap[corps]) {
-          corpsMap[corps] = { count: 0, earnings: 0 };
-        }
+        if (!corpsMap[corps]) corpsMap[corps] = { count: 0, earnings: 0 };
         corpsMap[corps].count += 1;
         corpsMap[corps].earnings += calculateEarnings(s);
       });
-
     const corpsDistributionData = Object.entries(corpsMap)
       .map(([name, data]) => ({
         name,
@@ -229,7 +210,6 @@ export default function ReportsAnalytics() {
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    // Earnings vs Deductions Over Time
     const earningsDeductionsMap = {};
     filteredPayrolls.forEach((p) => {
       const date = new Date(p.createdAt);
@@ -240,23 +220,19 @@ export default function ReportsAnalytics() {
       const sortKey = `${date.getFullYear()}-${String(
         date.getMonth() + 1
       ).padStart(2, "0")}`;
-
-      if (!earningsDeductionsMap[sortKey]) {
+      if (!earningsDeductionsMap[sortKey])
         earningsDeductionsMap[sortKey] = {
           month: monthYear,
           earnings: 0,
           deductions: 0,
           sortKey,
         };
-      }
-
       p.personnel.forEach((person) => {
         earningsDeductionsMap[sortKey].earnings += calculateEarnings(person);
         earningsDeductionsMap[sortKey].deductions +=
           calculateDeductions(person);
       });
     });
-
     const earningsVsDeductionsData = Object.values(earningsDeductionsMap)
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .map(({ month, earnings, deductions }) => ({
@@ -265,17 +241,58 @@ export default function ReportsAnalytics() {
         deductions,
       }));
 
-    // Status Distribution
     const statusMap = {};
     staff.forEach((s) => {
       const status = s.status || "unknown";
       if (!statusMap[status]) statusMap[status] = 0;
       statusMap[status] += 1;
     });
-
     const statusDistributionData = Object.entries(statusMap).map(
       ([name, value]) => ({ name, value })
     );
+
+    const payrollBreakdownData = filteredPayrolls
+      .map((p) => {
+        const totalEarnings = p.personnel.reduce(
+          (sum, person) => sum + calculateEarnings(person),
+          0
+        );
+        const totalDeductions = p.personnel.reduce(
+          (sum, person) => sum + calculateDeductions(person),
+          0
+        );
+        const netPay = p.personnel.reduce(
+          (sum, person) => sum + calculateNetPay(person),
+          0
+        );
+        return {
+          period: `${p.month} ${p.year}`,
+          personnelCount: p.personnel.length,
+          totalEarnings,
+          totalDeductions,
+          netPay,
+          month: p.month,
+          year: p.year,
+        };
+      })
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        const monthOrder = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+        return monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month);
+      });
 
     return {
       analytics: analyticsData,
@@ -285,6 +302,7 @@ export default function ReportsAnalytics() {
       statusDistribution: statusDistributionData,
       salaryComponents: salaryComponentsData,
       deductionComponents: deductionComponentsData,
+      payrollBreakdown: payrollBreakdownData,
     };
   }, [
     staffData,
@@ -292,20 +310,16 @@ export default function ReportsAnalytics() {
     dateRange,
     calculateEarnings,
     calculateDeductions,
+    calculateNetPay,
   ]);
 
-  // Export functions
   const exportToPDF = () => {
     const doc = new jsPDF();
-
     doc.setFontSize(18);
     doc.text("Payroll Analytics Report", 14, 20);
-
     doc.setFontSize(11);
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 30);
     doc.text(`Period: ${dateRange === "all" ? "All Time" : dateRange}`, 14, 37);
-
-    // Summary table
     autoTable(doc, {
       startY: 45,
       head: [["Metric", "Value"]],
@@ -323,39 +337,24 @@ export default function ReportsAnalytics() {
         ["Average Earnings", `₦${analytics.averageAllowance.toLocaleString()}`],
       ],
     });
-
-    // Monthly disbursement table
-    if (monthlyDisbursed.length > 0) {
+    if (payrollBreakdown.length > 0) {
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 10,
-        head: [["Month", "Amount Disbursed"]],
-        body: monthlyDisbursed.map((m) => [
-          m.month,
-          `₦${m.amount.toLocaleString()}`,
+        head: [["Period", "Personnel", "Earnings", "Deductions", "Net Pay"]],
+        body: payrollBreakdown.map((p) => [
+          p.period,
+          p.personnelCount.toString(),
+          `₦${p.totalEarnings.toLocaleString()}`,
+          `₦${p.totalDeductions.toLocaleString()}`,
+          `₦${p.netPay.toLocaleString()}`,
         ]),
       });
     }
-
-    // Corps distribution table
-    if (corpsDistribution.length > 0) {
-      autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 10,
-        head: [["Corps", "Personnel Count", "Total Earnings"]],
-        body: corpsDistribution.map((c) => [
-          c.name,
-          c.count.toString(),
-          `₦${c.value.toLocaleString()}`,
-        ]),
-      });
-    }
-
     doc.save(`payroll-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const exportToExcel = () => {
     const wb = XLSX.utils.book_new();
-
-    // Summary sheet
     const summaryData = [
       ["Payroll Analytics Report"],
       ["Generated:", new Date().toLocaleDateString()],
@@ -368,28 +367,16 @@ export default function ReportsAnalytics() {
       ["Active Personnel", analytics.activeStaff],
       ["Average Earnings", analytics.averageAllowance],
     ];
-
     const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
-
-    // Monthly disbursement sheet
-    if (monthlyDisbursed.length > 0) {
-      const ws2 = XLSX.utils.json_to_sheet(monthlyDisbursed);
-      XLSX.utils.book_append_sheet(wb, ws2, "Monthly Disbursement");
+    if (payrollBreakdown.length > 0) {
+      const ws2 = XLSX.utils.json_to_sheet(payrollBreakdown);
+      XLSX.utils.book_append_sheet(wb, ws2, "Payroll Breakdown");
     }
-
-    // Corps distribution sheet
-    if (corpsDistribution.length > 0) {
-      const ws3 = XLSX.utils.json_to_sheet(corpsDistribution);
-      XLSX.utils.book_append_sheet(wb, ws3, "Corps Distribution");
-    }
-
-    // Earnings vs Deductions sheet
     if (earningsVsDeductions.length > 0) {
-      const ws4 = XLSX.utils.json_to_sheet(earningsVsDeductions);
-      XLSX.utils.book_append_sheet(wb, ws4, "Earnings vs Deductions");
+      const ws3 = XLSX.utils.json_to_sheet(earningsVsDeductions);
+      XLSX.utils.book_append_sheet(wb, ws3, "Earnings vs Deductions");
     }
-
     XLSX.writeFile(
       wb,
       `payroll-report-${new Date().toISOString().split("T")[0]}.xlsx`
@@ -409,7 +396,6 @@ export default function ReportsAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -447,7 +433,6 @@ export default function ReportsAnalytics() {
         </div>
       </div>
 
-      {/* Analytics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-600">
           <p className="text-gray-600 text-sm font-medium mb-2">
@@ -462,17 +447,6 @@ export default function ReportsAnalytics() {
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
           <p className="text-gray-600 text-sm font-medium mb-2">
-            Average Monthly Payroll
-          </p>
-          <p className="text-3xl font-bold text-gray-800 mb-1">
-            ₦{analytics.averagePayroll.toLocaleString()}
-          </p>
-          <p className="text-xs text-green-600 font-medium">
-            Per payroll cycle
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-700">
-          <p className="text-gray-600 text-sm font-medium mb-2">
             Total Personnel
           </p>
           <p className="text-3xl font-bold text-gray-800 mb-1">
@@ -480,6 +454,17 @@ export default function ReportsAnalytics() {
           </p>
           <p className="text-xs text-gray-500">
             {analytics.activeStaff} active personnel
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-700">
+          <p className="text-gray-600 text-sm font-medium mb-2">
+            Average Monthly Payroll
+          </p>
+          <p className="text-3xl font-bold text-gray-800 mb-1">
+            ₦{analytics.averagePayroll.toLocaleString()}
+          </p>
+          <p className="text-xs text-green-600 font-medium">
+            Per payroll cycle
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-800">
@@ -493,9 +478,7 @@ export default function ReportsAnalytics() {
         </div>
       </div>
 
-      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Payroll Disbursed OR Salary Components */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             {monthlyDisbursed.length > 0
@@ -532,32 +515,11 @@ export default function ReportsAnalytics() {
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-64 bg-gray-50 rounded">
-              <div className="text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                <p className="text-gray-500 mt-2">
-                  No payroll or salary data available.
-                </p>
-                <p className="text-gray-400 text-sm mt-1">
-                  Add staff with salary information to see this chart.
-                </p>
-              </div>
+              <p className="text-gray-500">No payroll data available.</p>
             </div>
           )}
         </div>
 
-        {/* Corps Distribution (Pie Chart) */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             Earnings Distribution by Corps
@@ -602,9 +564,7 @@ export default function ReportsAnalytics() {
         </div>
       </div>
 
-      {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Earnings vs Deductions Line Chart OR Deduction Components */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             {earningsVsDeductions.length > 0
@@ -654,32 +614,11 @@ export default function ReportsAnalytics() {
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-64 bg-gray-50 rounded">
-              <div className="text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                <p className="text-gray-500 mt-2">
-                  No deduction data available.
-                </p>
-                <p className="text-gray-400 text-sm mt-1">
-                  Add staff with deduction information to see this chart.
-                </p>
-              </div>
+              <p className="text-gray-500">No deduction data available.</p>
             </div>
           )}
         </div>
 
-        {/* Personnel Status Distribution */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             Personnel Status Distribution
@@ -717,48 +656,81 @@ export default function ReportsAnalytics() {
         </div>
       </div>
 
-      {/* Corps Summary Table */}
-      {corpsDistribution.length > 0 && (
+      {payrollBreakdown.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Corps Breakdown Summary
+            Payroll Breakdown Summary
           </h3>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Corps
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Period
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Personnel Count
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Personnel
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Earnings
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Earnings
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Average per Person
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Deductions
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Net Pay
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {corpsDistribution.map((corps, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {corps.name}
+                {payrollBreakdown.map((p, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {p.period}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {corps.count}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {p.personnelCount}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ₦{corps.value.toLocaleString()}
+                    <td className="px-6 py-4 text-sm text-blue-700 font-semibold">
+                      ₦{p.totalEarnings.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ₦{Math.round(corps.value / corps.count).toLocaleString()}
+                    <td className="px-6 py-4 text-sm text-red-700 font-semibold">
+                      ₦{p.totalDeductions.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-green-700 font-bold">
+                      ₦{p.netPay.toLocaleString()}
                     </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-gray-100">
+                <tr>
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                    TOTAL
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                    {payrollBreakdown.reduce((s, p) => s + p.personnelCount, 0)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-blue-700">
+                    ₦
+                    {payrollBreakdown
+                      .reduce((s, p) => s + p.totalEarnings, 0)
+                      .toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-red-700">
+                    ₦
+                    {payrollBreakdown
+                      .reduce((s, p) => s + p.totalDeductions, 0)
+                      .toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-green-700">
+                    ₦
+                    {payrollBreakdown
+                      .reduce((s, p) => s + p.netPay, 0)
+                      .toLocaleString()}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

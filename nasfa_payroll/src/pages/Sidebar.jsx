@@ -9,14 +9,14 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
-import NairaIcon from "../components/Icons/NairaIcon"; // adjust path if needed
+import NairaIcon from "../components/Icons/NairaIcon";
 
 export default function Sidebar({ activeMenu, setActiveMenu, sidebarOpen }) {
   const navigate = useNavigate();
 
   const menuItems = [
     { name: "Dashboard Overview", icon: LayoutDashboard },
-    { name: "Payroll Management", icon: NairaIcon }, // ✅ Lucide-style Naira symbol
+    { name: "Payroll Management", icon: NairaIcon },
     { name: "Payroll Calendar", icon: Calendar },
     { name: "Staff Management", icon: Users },
     { name: "Recent Activities", icon: Activity },
@@ -25,9 +25,7 @@ export default function Sidebar({ activeMenu, setActiveMenu, sidebarOpen }) {
   ];
 
   const handleLogout = () => {
-    // Clear token and any other session info
     localStorage.removeItem("token");
-    // Navigate to login page
     navigate("/");
   };
 

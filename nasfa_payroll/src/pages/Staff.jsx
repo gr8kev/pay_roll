@@ -20,7 +20,7 @@ export default function Staff() {
   const [submitting, setSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
-  const [statusFilter, setStatusFilter] = useState("all"); // all, active, inactive
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const initialFormData = {
     firstName: "",

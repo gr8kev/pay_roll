@@ -181,7 +181,7 @@ const Dashboard = () => {
               {
                 label: "Total Personnel",
                 value: stats.totalPersonnel,
-                color: "bg-green-600",
+                color: "bg-green-600 ",
               },
               {
                 label: "Active Personnel",

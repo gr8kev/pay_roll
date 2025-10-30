@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 
 const GlobalDataContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useGlobalData = () => {
   const context = useContext(GlobalDataContext);
   if (!context)
@@ -16,6 +17,30 @@ export const GlobalDataProvider = ({ children }) => {
   const [payrollData, setPayrollData] = useState([]);
   const [payrollTotal, setPayrollTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // --- Fetch Current User ---
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        // Replace this with your actual user authentication endpoint
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`
+        );
+        setCurrentUser(res.data.user);
+      } catch (err) {
+        console.error("User fetch error:", err);
+        // Fallback to localStorage or default
+        const storedUser = localStorage.getItem("currentUser");
+        setCurrentUser(
+          storedUser
+            ? JSON.parse(storedUser)
+            : { name: "Admin", email: "admin@system.com" }
+        );
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   // --- Helpers ---
   const calculateEarnings = (person) => {
@@ -124,7 +149,23 @@ export const GlobalDataProvider = ({ children }) => {
   );
 
   // --- CRUD Helpers ---
-  const addStaff = (newStaff) => setStaffData((prev) => [...prev, newStaff]);
+  const addStaff = (newStaff) => {
+    setStaffData((prev) => [...prev, newStaff]);
+
+    // Dispatch event for notification
+    const userName = currentUser?.name || currentUser?.username || "Admin";
+    window.dispatchEvent(
+      new CustomEvent("staffAdded", {
+        detail: {
+          firstName: newStaff.firstName,
+          lastName: newStaff.lastName,
+          serviceNumber: newStaff.serviceNumber,
+          addedBy: userName,
+        },
+        bubbles: true,
+      })
+    );
+  };
 
   const updateStaff = (updatedStaff) =>
     setStaffData((prev) =>
@@ -149,12 +190,62 @@ export const GlobalDataProvider = ({ children }) => {
   // --- Toggle Status ---
   const toggleStaffStatus = async (id) => {
     try {
+      const staffMember = staffData.find((s) => String(s._id) === String(id));
+      if (!staffMember) {
+        toast.error("Staff member not found");
+        return;
+      }
+
+      const oldStatus = staffMember.status;
+
       const res = await axios.patch(
         `${import.meta.env.VITE_API_BASE_URL}/api/staff/${id}/toggle-status`
       );
       const updatedStaff = res.data.data;
+
+      // Update local state
       updateStaff(updatedStaff);
       toast.success(res.data.message);
+
+      // Get current user info
+      const userName = currentUser?.name || currentUser?.username || "Admin";
+      const userEmail = currentUser?.email || "";
+
+      // Create activity event with proper details
+      const activityEvent = {
+        id: `toggle-${id}-${Date.now()}`,
+        type: "status_change",
+        staffId: id,
+        staffName: `${staffMember.firstName} ${staffMember.lastName}`,
+        serviceNumber: staffMember.serviceNumber,
+        oldStatus: oldStatus,
+        newStatus: updatedStaff.status,
+        user: userName,
+        userEmail: userEmail,
+        timestamp: new Date().toISOString(),
+        description: `Changed status from ${oldStatus} to ${updatedStaff.status}`,
+      };
+
+      console.log("Dispatching staffToggled event:", activityEvent);
+
+      // Dispatch the event
+      window.dispatchEvent(
+        new CustomEvent("staffToggled", {
+          detail: activityEvent,
+          bubbles: true,
+        })
+      );
+
+      // Also store in localStorage as backup
+      const storedActivities = JSON.parse(
+        localStorage.getItem("staffActivities") || "[]"
+      );
+      storedActivities.unshift(activityEvent);
+      // Keep only last 100 activities
+      if (storedActivities.length > 100) {
+        storedActivities.pop();
+      }
+      localStorage.setItem("staffActivities", JSON.stringify(storedActivities));
     } catch (err) {
       console.error("Toggle status error:", err);
       toast.error(err.response?.data?.error || "Error toggling status");
@@ -193,6 +284,7 @@ export const GlobalDataProvider = ({ children }) => {
         payrollData,
         payrollTotal,
         loading,
+        currentUser,
         fetchAllData,
         addStaff,
         updateStaff,
