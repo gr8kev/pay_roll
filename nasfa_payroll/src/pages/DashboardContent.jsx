@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useGlobalData } from "../components/context/GlobalDataContext";
 import {
   BarChart,
@@ -10,9 +10,10 @@ import {
   Legend,
   ResponsiveContainer,
   Cell,
+  LineChart,
+  Line,
 } from "recharts";
 import { ToastContainer } from "react-toastify";
-// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -23,6 +24,12 @@ const COLORS = [
   "#4ade80",
   "#86efac",
   "#a7f3d0",
+  "#bbf7d0",
+  "#dcfce7",
+  "#10b981",
+  "#059669",
+  "#047857",
+  "#065f46",
 ];
 
 const Dashboard = () => {
@@ -35,6 +42,9 @@ const Dashboard = () => {
     totalEarnings,
     calculateNetPay,
   } = useGlobalData();
+
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [chartType, setChartType] = useState("bar"); // 'bar' or 'line'
 
   const safeFormat = (value) =>
     typeof value === "number" && !isNaN(value) ? value.toLocaleString() : "0";
@@ -53,103 +63,107 @@ const Dashboard = () => {
   };
 
   // ======================= COMPUTED DATA =========================
-  const { stats, payrollTrend, recentActivities } = useMemo(() => {
-    const staff = Array.isArray(staffData) ? staffData : [];
-    const payrolls = Array.isArray(payrollData) ? payrollData : [];
+  const { stats, payrollTrend, recentActivities, availableYears } =
+    useMemo(() => {
+      const staff = Array.isArray(staffData) ? staffData : [];
+      const payrolls = Array.isArray(payrollData) ? payrollData : [];
 
-    const totalPersonnel = staff.length;
-    const activePersonnel = staff.filter(
-      (s) => s.status?.toLowerCase() === "active"
-    ).length;
-    const inactivePersonnel = totalPersonnel - activePersonnel;
+      const totalPersonnel = staff.length;
+      const activePersonnel = staff.filter(
+        (s) => s.status?.toLowerCase() === "active"
+      ).length;
+      const inactivePersonnel = totalPersonnel - activePersonnel;
 
-    // Last 6 months
-    const last6Months = Array.from({ length: 6 })
-      .map((_, i) => {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        return {
-          month: date.toLocaleString("en-US", { month: "long" }),
-          year: date.getFullYear(),
-        };
-      })
-      .reverse();
-
-    // Payroll trend with totalNetPay per month
-    const payrollTrendData = last6Months.map(({ month, year }) => {
-      const payroll = payrolls.find(
-        (p) => p.month === month && p.year === year
+      // Get all years from payroll data
+      const years = [...new Set(payrolls.map((p) => p.year))].sort(
+        (a, b) => b - a
       );
-      const totalNetPay = payroll?.personnel
-        ? payroll.personnel.reduce((sum, p) => sum + calculateNetPay(p), 0)
-        : 0;
+      const yearsAvailable =
+        years.length > 0 ? years : [new Date().getFullYear()];
+
+      // All 12 months
+      const allMonths = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      // Payroll trend for selected year (all 12 months)
+      const payrollTrendData = allMonths.map((month) => {
+        const payroll = payrolls.find(
+          (p) => p.month === month && p.year === selectedYear
+        );
+        const totalNetPay = payroll?.personnel
+          ? payroll.personnel.reduce((sum, p) => sum + calculateNetPay(p), 0)
+          : 0;
+
+        return {
+          name: month.substring(0, 3),
+          fullName: month,
+          totalNetPay,
+          personnelCount: payroll?.personnel?.length ?? 0,
+          year: selectedYear,
+        };
+      });
+
+      // Recent Activities
+      const activities = [];
+      payrolls.slice(0, 3).forEach((p) => {
+        activities.push({
+          type: "payroll",
+          message: `Payroll approved for ${p.month} ${p.year}`,
+          amount: p.personnel
+            ? p.personnel.reduce((sum, per) => sum + calculateNetPay(per), 0)
+            : 0,
+          time: formatTimeAgo(p.createdAt),
+          icon: "💰",
+        });
+      });
+
+      const recentStaff = [...staff]
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, 3);
+
+      recentStaff.forEach((s) => {
+        activities.push({
+          type: "staff",
+          message: `${s.firstName} ${s.lastName} added to personnel`,
+          time: formatTimeAgo(s.createdAt),
+          icon: "👤",
+        });
+      });
 
       return {
-        name: `${month.substring(0, 3)} ${year}`,
-        totalNetPay,
-        personnelCount: payroll?.personnel?.length ?? 0,
+        stats: {
+          totalPersonnel,
+          activePersonnel,
+          inactivePersonnel,
+          totalDeductions,
+          totalNetPayroll,
+          totalEarnings,
+        },
+        payrollTrend: payrollTrendData,
+        recentActivities: activities.slice(0, 5),
+        availableYears: yearsAvailable,
       };
-    });
-
-    // Corps Distribution
-    const corpsCounts = {};
-    staff.forEach((s) => {
-      const corps = s.corps || "Unassigned";
-      corpsCounts[corps] = (corpsCounts[corps] || 0) + 1;
-    });
-    const corpsChart = Object.entries(corpsCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-
-    // Recent Activities
-    const activities = [];
-    payrolls.slice(0, 3).forEach((p) => {
-      activities.push({
-        type: "payroll",
-        message: `Payroll approved for ${p.month} ${p.year}`,
-        amount: p.personnel
-          ? p.personnel.reduce((sum, per) => sum + calculateNetPay(per), 0)
-          : 0,
-        time: formatTimeAgo(p.createdAt),
-        icon: "💰",
-      });
-    });
-
-    const recentStaff = [...staff]
-      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-      .slice(0, 3);
-
-    recentStaff.forEach((s) => {
-      activities.push({
-        type: "staff",
-        message: `${s.firstName} ${s.lastName} added to personnel`,
-        time: formatTimeAgo(s.createdAt),
-        icon: "👤",
-      });
-    });
-
-    return {
-      stats: {
-        totalPersonnel,
-        activePersonnel,
-        inactivePersonnel,
-        totalDeductions,
-        totalNetPayroll,
-        totalEarnings,
-      },
-      payrollTrend: payrollTrendData,
-      corpsData: corpsChart,
-      recentActivities: activities.slice(0, 5),
-    };
-  }, [
-    staffData,
-    payrollData,
-    totalDeductions,
-    totalNetPayroll,
-    totalEarnings,
-    calculateNetPay,
-  ]);
+    }, [
+      staffData,
+      payrollData,
+      totalDeductions,
+      totalNetPayroll,
+      totalEarnings,
+      calculateNetPay,
+      selectedYear,
+    ]);
 
   const fadeUp = {
     hidden: { opacity: 0, y: 40 },
@@ -158,7 +172,7 @@ const Dashboard = () => {
 
   // ======================= RENDER =========================
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">
       <ToastContainer position="top-center" theme="colored" />
 
       {loading ? (
@@ -167,21 +181,21 @@ const Dashboard = () => {
         </div>
       ) : (
         <motion.div
-          className="space-y-8"
+          className="space-y-6 md:space-y-8"
           initial="hidden"
           animate="visible"
           transition={{ staggerChildren: 0.15 }}
         >
           {/* === Summary Stats === */}
           <motion.div
-            className="grid md:grid-cols-5 sm:grid-cols-2 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4"
             variants={fadeUp}
           >
             {[
               {
                 label: "Total Personnel",
                 value: stats.totalPersonnel,
-                color: "bg-green-600 ",
+                color: "bg-green-600",
               },
               {
                 label: "Active Personnel",
@@ -206,74 +220,209 @@ const Dashboard = () => {
             ].map((item, i) => (
               <motion.div
                 key={i}
-                className={`${item.color} text-white rounded-2xl p-4 text-center shadow`}
+                className={`${item.color} text-white rounded-xl md:rounded-2xl p-4 md:p-5 text-center shadow hover:shadow-lg transition-shadow`}
                 variants={fadeUp}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
               >
-                <h3 className="text-lg font-medium">{item.label}</h3>
-                <p className="text-2xl font-bold mt-1">{item.value}</p>
+                <h3 className="text-sm md:text-base lg:text-lg font-medium">
+                  {item.label}
+                </h3>
+                <p className="text-xl md:text-2xl font-bold mt-1 break-words">
+                  {item.value}
+                </p>
               </motion.div>
             ))}
           </motion.div>
 
-          {/* === Payroll Trend Bar Chart === */}
+          {/* === Payroll Trend Chart === */}
           <motion.div
-            className="bg-white rounded-2xl p-6 shadow mt-10"
+            className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow"
             variants={fadeUp}
           >
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">
-              Payroll Trend (Last 6 Months)
-            </h3>
-            {payrollTrend.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart
-                  data={payrollTrend}
-                  margin={{ top: 20, right: 20, left: 0, bottom: 5 }}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h3 className="text-base md:text-lg font-semibold text-gray-700">
+                Payroll Trend - {selectedYear}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {/* Year Selector */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" tick={{ fill: "#4b5563" }} />
-                  <YAxis tick={{ fill: "#4b5563" }} />
-                  <Tooltip
-                    formatter={(value, name, props) => {
-                      const data = props.payload;
-                      return [
-                        `₦${safeFormat(data.totalNetPay)}`,
-                        `${data.name} | ${data.personnelCount} personnel`,
-                      ];
-                    }}
-                    contentStyle={{
-                      backgroundColor: "#f9fafb",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="totalNetPay"
-                    name="Total Net Payroll"
-                    radius={[8, 8, 0, 0]}
+                  {availableYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Chart Type Selector */}
+                <div className="flex gap-1 border border-gray-300 rounded-lg p-1">
+                  <button
+                    onClick={() => setChartType("bar")}
+                    className={`px-3 py-1 text-xs rounded ${
+                      chartType === "bar"
+                        ? "bg-green-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
                   >
-                    {payrollTrend.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
+                    Bar
+                  </button>
+                  <button
+                    onClick={() => setChartType("line")}
+                    className={`px-3 py-1 text-xs rounded ${
+                      chartType === "line"
+                        ? "bg-green-600 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Line
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {payrollTrend.length > 0 ? (
+              <div className="w-full overflow-x-auto">
+                <ResponsiveContainer width="100%" height={350} minWidth={300}>
+                  {chartType === "bar" ? (
+                    <BarChart
+                      data={payrollTrend}
+                      margin={{ top: 20, right: 10, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: "#4b5563", fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
                       />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                      <YAxis tick={{ fill: "#4b5563", fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value, name, props) => {
+                          const data = props.payload;
+                          return [
+                            `₦${safeFormat(data.totalNetPay)}`,
+                            `${data.fullName} ${data.year} | ${data.personnelCount} personnel`,
+                          ];
+                        }}
+                        contentStyle={{
+                          backgroundColor: "#f9fafb",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Bar
+                        dataKey="totalNetPay"
+                        name="Total Net Payroll"
+                        radius={[8, 8, 0, 0]}
+                      >
+                        {payrollTrend.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  ) : (
+                    <LineChart
+                      data={payrollTrend}
+                      margin={{ top: 20, right: 10, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: "#4b5563", fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis tick={{ fill: "#4b5563", fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value, name, props) => {
+                          const data = props.payload;
+                          return [
+                            `₦${safeFormat(data.totalNetPay)}`,
+                            `${data.fullName} ${data.year} | ${data.personnelCount} personnel`,
+                          ];
+                        }}
+                        contentStyle={{
+                          backgroundColor: "#f9fafb",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Line
+                        type="monotone"
+                        dataKey="totalNetPay"
+                        name="Total Net Payroll"
+                        stroke="#16a34a"
+                        strokeWidth={3}
+                        dot={{ fill: "#16a34a", r: 5 }}
+                        activeDot={{ r: 7 }}
+                      />
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
             ) : (
               <div className="h-72 flex items-center justify-center text-gray-500">
-                <p>No payroll history available</p>
+                <div className="text-center">
+                  <p className="text-sm md:text-base">
+                    No payroll data for {selectedYear}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Select a different year or add payroll data
+                  </p>
+                </div>
               </div>
             )}
+
+            {/* Summary Stats for Selected Year */}
+            <div className="mt-6 pt-4 border-t grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-xs text-gray-500">Months with Data</p>
+                <p className="text-lg font-bold text-green-600">
+                  {payrollTrend.filter((m) => m.totalNetPay > 0).length}/12
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">
+                  Total Paid ({selectedYear})
+                </p>
+                <p className="text-lg font-bold text-blue-600">
+                  ₦
+                  {safeFormat(
+                    payrollTrend.reduce((sum, m) => sum + m.totalNetPay, 0)
+                  )}
+                </p>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <p className="text-xs text-gray-500">Avg per Month</p>
+                <p className="text-lg font-bold text-purple-600">
+                  ₦
+                  {safeFormat(
+                    Math.round(
+                      payrollTrend.reduce((sum, m) => sum + m.totalNetPay, 0) /
+                        12
+                    )
+                  )}
+                </p>
+              </div>
+            </div>
           </motion.div>
 
           {/* === Recent Activities === */}
           <motion.div
-            className="bg-white rounded-2xl p-6 shadow mt-10"
+            className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow"
             variants={fadeUp}
           >
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">
+            <h3 className="text-base md:text-lg font-semibold text-gray-700 mb-4">
               Recent Activities
             </h3>
             {recentActivities.length > 0 ? (
@@ -281,19 +430,23 @@ const Dashboard = () => {
                 {recentActivities.map((a, i) => (
                   <motion.li
                     key={i}
-                    className="flex items-center justify-between py-3"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-2"
                     variants={fadeUp}
                     transition={{ delay: i * 0.1 }}
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{a.icon}</span>
-                      <div>
-                        <p className="text-gray-800">{a.message}</p>
-                        <p className="text-sm text-gray-500">{a.time}</p>
+                      <span className="text-xl sm:text-2xl">{a.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm md:text-base text-gray-800 break-words">
+                          {a.message}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          {a.time}
+                        </p>
                       </div>
                     </div>
                     {a.amount && (
-                      <span className="text-green-600 font-semibold">
+                      <span className="text-green-600 font-semibold text-sm md:text-base ml-10 sm:ml-0">
                         ₦{safeFormat(a.amount)}
                       </span>
                     )}
@@ -302,7 +455,7 @@ const Dashboard = () => {
               </ul>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <p>No recent activities</p>
+                <p className="text-sm md:text-base">No recent activities</p>
               </div>
             )}
           </motion.div>

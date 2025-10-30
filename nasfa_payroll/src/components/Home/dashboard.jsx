@@ -9,7 +9,6 @@ import ReportsAnalytics from "../../pages/Reports";
 import Activities from "../../pages/Activities";
 
 export default function Dashboard() {
-  // Load the saved menu from localStorage, or default to "Dashboard"
   const [activeMenu, setActiveMenu] = useState(() => {
     const savedMenu = localStorage.getItem("activeMenu");
     return savedMenu || "Dashboard";
@@ -17,7 +16,6 @@ export default function Dashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Save activeMenu to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem("activeMenu", activeMenu);
   }, [activeMenu]);

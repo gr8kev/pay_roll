@@ -22,17 +22,21 @@ def signup():
         email = data.get('email')
         password = data.get('password')
         confirm_password = data.get('confirmPassword')
+        profile_picture = data.get('profilePicture', '')  
 
-        # Validation checks
         if not all([full_name, rank, service_number, email, password, confirm_password]):
-            return jsonify({"error": "All fields are required"}), 400
+            return jsonify({"error": "All required fields must be filled"}), 400
 
         if password != confirm_password:
             return jsonify({"error": "Passwords do not match"}), 400
 
         existing_user = mongo.db.users.find_one({"email": email})
         if existing_user:
-            return jsonify({"msg": "User already exists"}), 409
+            return jsonify({"error": "User with this email already exists"}), 409
+
+        existing_service_number = mongo.db.users.find_one({"serviceNumber": service_number})
+        if existing_service_number:
+            return jsonify({"error": "Service number already registered"}), 409
 
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
@@ -42,19 +46,26 @@ def signup():
             "serviceNumber": service_number,
             "email": email,
             "password": hashed_password.decode('utf-8'),
+            "profilePicture": profile_picture,  
             "createdAt": datetime.utcnow()
         }
 
         mongo.db.users.insert_one(user_data)
 
         access_token = create_access_token(
-            identity=email,
+            identity=service_number,
             expires_delta=timedelta(days=7)
         )
 
         return jsonify({
             "msg": "User created successfully",
-            "access_token": access_token
+            "access_token": access_token,
+            "user": {
+                "fullName": full_name,
+                "rank": rank,
+                "serviceNumber": service_number,
+                "profilePicture": profile_picture
+            }
         }), 201
 
     except Exception as e:
@@ -76,12 +87,10 @@ def login():
         if not service_number or not password:
             return jsonify({"msg": "Missing service number or password"}), 400
 
-        # Search by serviceNumber instead of email
         user = mongo.db.users.find_one({"serviceNumber": service_number})
         if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
             return jsonify({"msg": "Invalid service number or password"}), 401
 
-        # Use serviceNumber as identity
         access_token = create_access_token(
             identity=service_number,
             expires_delta=timedelta(days=7)
@@ -92,7 +101,8 @@ def login():
             "access_token": access_token,
             "fullName": user.get("fullName"),
             "rank": user.get("rank"),
-            "serviceNumber": user.get("serviceNumber")  
+            "serviceNumber": user.get("serviceNumber"),
+            "profilePicture": user.get("profilePicture", "")  
         }), 200
 
     except Exception as e:

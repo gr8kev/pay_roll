@@ -21,22 +21,34 @@ export const GlobalDataProvider = ({ children }) => {
 
   // --- Fetch Current User ---
   useEffect(() => {
-    const fetchCurrentUser = async () => {
+    const fetchCurrentUser = () => {
       try {
-        // Replace this with your actual user authentication endpoint
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`
-        );
-        setCurrentUser(res.data.user);
+        // Get user from localStorage
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setCurrentUser({
+            name: user.fullName,
+            email: user.email || "",
+            rank: user.rank,
+            serviceNumber: user.serviceNumber,
+            profilePicture: user.profilePicture || "",
+          });
+        } else {
+          // Fallback
+          setCurrentUser({
+            name: "Admin",
+            email: "admin@system.com",
+            profilePicture: "",
+          });
+        }
       } catch (err) {
         console.error("User fetch error:", err);
-        // Fallback to localStorage or default
-        const storedUser = localStorage.getItem("currentUser");
-        setCurrentUser(
-          storedUser
-            ? JSON.parse(storedUser)
-            : { name: "Admin", email: "admin@system.com" }
-        );
+        setCurrentUser({
+          name: "Admin",
+          email: "admin@system.com",
+          profilePicture: "",
+        });
       }
     };
     fetchCurrentUser();
@@ -153,7 +165,7 @@ export const GlobalDataProvider = ({ children }) => {
     setStaffData((prev) => [...prev, newStaff]);
 
     // Dispatch event for notification
-    const userName = currentUser?.name || currentUser?.username || "Admin";
+    const userName = currentUser?.name || "Admin";
     window.dispatchEvent(
       new CustomEvent("staffAdded", {
         detail: {
@@ -176,11 +188,28 @@ export const GlobalDataProvider = ({ children }) => {
 
   const deleteStaff = async (id) => {
     try {
+      const staffMember = staffData.find((s) => String(s._id) === String(id));
+
       await axios.delete(
         `${import.meta.env.VITE_API_BASE_URL}/api/staff/${id}`
       );
       setStaffData((prev) => prev.filter((s) => String(s._id) !== String(id)));
       toast.success("Personnel deleted successfully!");
+
+      // Dispatch event for notification
+      if (staffMember) {
+        const userName = currentUser?.name || "Admin";
+        window.dispatchEvent(
+          new CustomEvent("staffDeleted", {
+            detail: {
+              staffName: `${staffMember.firstName} ${staffMember.lastName}`,
+              serviceNumber: staffMember.serviceNumber,
+              deletedBy: userName,
+            },
+            bubbles: true,
+          })
+        );
+      }
     } catch (err) {
       console.error("Delete staff error:", err);
       toast.error(err.response?.data?.error || "Error deleting staff");
@@ -208,7 +237,7 @@ export const GlobalDataProvider = ({ children }) => {
       toast.success(res.data.message);
 
       // Get current user info
-      const userName = currentUser?.name || currentUser?.username || "Admin";
+      const userName = currentUser?.name || "Admin";
       const userEmail = currentUser?.email || "";
 
       // Create activity event with proper details
@@ -252,8 +281,23 @@ export const GlobalDataProvider = ({ children }) => {
     }
   };
 
-  const addPayroll = (newPayroll) =>
+  const addPayroll = (newPayroll) => {
     setPayrollData((prev) => [newPayroll, ...prev]);
+
+    // Dispatch event for notification
+    const userName = currentUser?.name || "Admin";
+    window.dispatchEvent(
+      new CustomEvent("payrollCreated", {
+        detail: {
+          month: newPayroll.month,
+          year: newPayroll.year,
+          personnelCount: newPayroll.personnel?.length || 0,
+          createdBy: userName,
+        },
+        bubbles: true,
+      })
+    );
+  };
 
   const updatePayroll = (updatedPayroll) =>
     setPayrollData((prev) =>
